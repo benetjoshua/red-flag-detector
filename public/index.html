@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Red Flag Detector</title>
+  <meta name="description" content="Paste any job description, offer letter, or company policy. Get a clear breakdown of every red flag." />
+  <meta property="og:title" content="Red Flag Detector" />
+  <meta property="og:description" content="Paste a JD and find out how bad it really is." />
+  <style>
+    :root {
+      --rf-bg: #f5f4f1;
+      --rf-surface: #ffffff;
+      --rf-border: rgba(0,0,0,0.09);
+      --rf-text: #111110;
+      --rf-text-2: #6b6a67;
+      --rf-text-3: #a09e9a;
+      --rf-accent: #c0392b;
+      --rf-accent-light: #fdf0ee;
+      --rf-minor: #a05c00;
+      --rf-minor-light: #fdf4e3;
+      --rf-score-bg: #eeece8;
+      --rf-input-bg: #fafaf8;
+      --rf-tag-bg: #eeecea;
+      --rf-tag-text: #5f5e5a;
+    }
+    [data-theme="dark"] {
+      --rf-bg: #181816;
+      --rf-surface: #222220;
+      --rf-border: rgba(255,255,255,0.09);
+      --rf-text: #eeece8;
+      --rf-text-2: #9e9c98;
+      --rf-text-3: #6a6866;
+      --rf-accent: #e07060;
+      --rf-accent-light: #2e1e1a;
+      --rf-minor: #d48c30;
+      --rf-minor-light: #261e10;
+      --rf-score-bg: #2a2826;
+      --rf-input-bg: #2a2826;
+      --rf-tag-bg: #2a2826;
+      --rf-tag-text: #9e9c98;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { min-height: 100%; }
+    body {
+      background: var(--rf-bg);
+      color: var(--rf-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      transition: background 0.2s, color 0.2s;
+      -webkit-font-smoothing: antialiased;
+    }
+    #app { max-width: 640px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    .topbar { display: flex; justify-content: flex-end; margin-bottom: 2.5rem; }
+    .theme-btn {
+      background: var(--rf-tag-bg);
+      border: 0.5px solid var(--rf-border);
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--rf-text-2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: color 0.15s;
+    }
+    .theme-btn:hover { color: var(--rf-text); }
+    h1 { font-size: 28px; font-weight: 600; line-height: 1.2; color: var(--rf-text); margin-bottom: 0.4rem; }
+    .subtitle { font-size: 14px; color: var(--rf-text-2); margin-bottom: 2rem; line-height: 1.6; }
+    .input-card {
+      background: var(--rf-surface);
+      border: 0.5px solid var(--rf-border);
+      border-radius: 16px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .label-row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+    .label-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 0.5px solid var(--rf-border);
+      background: transparent;
+      color: var(--rf-text-2);
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .label-btn.active { background: var(--rf-text); color: var(--rf-bg); border-color: var(--rf-text); }
+    .label-btn:hover:not(.active) { border-color: var(--rf-text-2); color: var(--rf-text); }
+    textarea {
+      width: 100%;
+      background: var(--rf-input-bg);
+      border: 0.5px solid var(--rf-border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      color: var(--rf-text);
+      font-family: inherit;
+      resize: vertical;
+      min-height: 180px;
+      line-height: 1.6;
+      outline: none;
+      transition: border 0.15s;
+    }
+    textarea:focus { border-color: var(--rf-text-3); }
+    textarea::placeholder { color: var(--rf-text-3); }
+    .char-count { font-size: 11px; color: var(--rf-text-3); text-align: right; margin-top: 6px; margin-bottom: 1rem; }
+    .char-count.warn { color: var(--rf-minor); }
+    #analyze-btn {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      background: #1a1a18;
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      letter-spacing: 0.01em;
+      transition: opacity 0.15s;
+    }
+    #analyze-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .loading { text-align: center; padding: 3rem 0; }
+    .loading-dots { display: flex; justify-content: center; gap: 6px; margin-bottom: 1rem; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--rf-text-3); animation: bounce 1.2s infinite; }
+    .dot:nth-child(2) { animation-delay: 0.2s; }
+    .dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,80%,100%{transform:scale(0.6);opacity:0.4} 40%{transform:scale(1);opacity:1} }
+    .loading-text { font-size: 13px; color: var(--rf-text-2); }
+    #results { display: none; }
+    .results-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 8px; }
+    .results-label { font-size: 11px; color: var(--rf-text-3); font-weight: 500; letter-spacing: 0.07em; text-transform: uppercase; }
+    .action-btn {
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 0.5px solid var(--rf-border);
+      background: transparent;
+      color: var(--rf-text-2);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .action-btn:hover { color: var(--rf-text); border-color: var(--rf-text-2); }
+    .screenshot-card {
+      background: var(--rf-surface);
+      border: 0.5px solid var(--rf-border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .company-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.25rem;
+      padding-bottom: 1rem;
+      border-bottom: 0.5px solid var(--rf-border);
+    }
+    .company-name { font-size: 16px; font-weight: 600; display: block; margin-bottom: 4px; }
+    .company-type-tag {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      background: var(--rf-tag-bg);
+      color: var(--rf-tag-text);
+    }
+    .hide-toggle { font-size: 12px; color: var(--rf-text-3); cursor: pointer; background: none; border: none; font-family: inherit; flex-shrink: 0; transition: color 0.15s; }
+    .hide-toggle:hover { color: var(--rf-text-2); }
+    .section-title { font-size: 11px; font-weight: 500; color: var(--rf-text-3); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.75rem; }
+    .flag-item { padding: 1rem; border-radius: 10px; margin-bottom: 8px; }
+    .flag-item.major { background: var(--rf-accent-light); }
+    .flag-item.minor { background: var(--rf-minor-light); }
+    .flag-header { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 4px; }
+    .flag-icon { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+    .flag-title { font-size: 14px; font-weight: 500; }
+    .flag-roast { font-size: 13px; color: var(--rf-text-2); line-height: 1.6; padding-left: 26px; }
+    .flag-item.major .flag-title { color: var(--rf-accent); }
+    .flag-item.minor .flag-title { color: var(--rf-minor); }
+    .show-minor-btn {
+      width: 100%;
+      padding: 10px;
+      background: transparent;
+      border: 0.5px dashed var(--rf-border);
+      border-radius: 10px;
+      font-size: 13px;
+      color: var(--rf-text-2);
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 4px;
+      margin-bottom: 1.25rem;
+      transition: all 0.15s;
+    }
+    .show-minor-btn:hover { background: var(--rf-tag-bg); color: var(--rf-text); }
+    #minor-flags { display: none; margin-top: 8px; margin-bottom: 1.25rem; }
+    .divider { height: 0.5px; background: var(--rf-border); margin: 1.25rem 0; }
+    .score-section { text-align: center; padding: 0.25rem 0 0.5rem; }
+    .gauge-label { font-size: 11px; color: var(--rf-text-3); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 0.75rem; }
+    .gauge-wrap { position: relative; width: 200px; height: 110px; margin: 0 auto; }
+    .score-num { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: 38px; font-weight: 600; color: var(--rf-text); line-height: 1; }
+    .score-sub { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--rf-text-3); white-space: nowrap; }
+    .verdict-box { background: var(--rf-score-bg); border-radius: 10px; padding: 1rem 1.25rem; margin-top: 1.75rem; }
+    .verdict-text { font-size: 14px; color: var(--rf-text-2); line-height: 1.7; }
+    .reset-btn {
+      width: 100%;
+      padding: 12px;
+      margin-top: 1.5rem;
+      background: transparent;
+      border: 0.5px solid var(--rf-border);
+      border-radius: 10px;
+      font-size: 14px;
+      color: var(--rf-text-2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .reset-btn:hover { background: var(--rf-tag-bg); color: var(--rf-text); }
+    .error-box {
+      background: var(--rf-accent-light);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-top: 1rem;
+      font-size: 14px;
+      color: var(--rf-accent);
+      text-align: center;
+      line-height: 1.5;
+    }
+    @media (max-width: 480px) {
+      h1 { font-size: 24px; }
+      #app { padding: 1.5rem 1rem 3rem; }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <button class="theme-btn" onclick="toggleTheme()">Toggle theme</button>
+  </div>
+
+  <h1>Red Flag Detector</h1>
+  <p class="subtitle">Paste any job description, offer letter, or company policy.<br>Get a clear breakdown of every red flag.</p>
+
+  <div class="input-card">
+    <div class="label-row">
+      <button class="label-btn active" onclick="setLabel(this,'Job Description')">Job Description</button>
+      <button class="label-btn" onclick="setLabel(this,'Offer Letter')">Offer Letter</button>
+      <button class="label-btn" onclick="setLabel(this,'Company Policy')">Company Policy</button>
+    </div>
+    <textarea id="paste-input" placeholder="Paste it here..." maxlength="10000" oninput="updateChar()"></textarea>
+    <div class="char-count" id="char-count">0 / 10,000</div>
+    <button id="analyze-btn" onclick="analyze()">Detect Red Flags</button>
+  </div>
+
+  <div id="error-msg" style="display:none"></div>
+
+  <div id="loading" style="display:none">
+    <div class="loading">
+      <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <div class="loading-text" id="loading-text">Reading between the lines...</div>
+    </div>
+  </div>
+
+  <div id="results">
+    <div class="results-topbar">
+      <span class="results-label">Analysis</span>
+      <button class="action-btn" onclick="newAnalysis()">New analysis</button>
+    </div>
+    <div class="screenshot-card" id="screenshot-card">
+      <div class="company-row" id="company-row">
+        <div>
+          <span class="company-name" id="company-name-display"></span>
+          <span class="company-type-tag" id="doc-type-tag"></span>
+        </div>
+        <button class="hide-toggle" id="hide-toggle-btn" onclick="toggleCompany()">Hide details</button>
+      </div>
+      <div class="section-title">Major red flags</div>
+      <div id="major-flags-list"></div>
+      <button class="show-minor-btn" id="show-minor-btn" onclick="toggleMinor()">+ Show 2 minor red flags</button>
+      <div id="minor-flags">
+        <div class="section-title">Minor red flags</div>
+        <div id="minor-flags-list"></div>
+      </div>
+      <div class="divider"></div>
+      <div class="score-section">
+        <div class="gauge-label">Employee score</div>
+        <div class="gauge-wrap">
+          <canvas id="gauge-canvas" width="200" height="110"></canvas>
+          <span class="score-num" id="score-num">—</span>
+          <span class="score-sub">out of 10</span>
+        </div>
+        <div style="height:24px"></div>
+        <div class="verdict-box">
+          <div class="verdict-text" id="verdict-text"></div>
+        </div>
+      </div>
+    </div>
+    <button class="reset-btn" onclick="newAnalysis()">Start over</button>
+  </div>
+</div>
+
+<script>
+  let currentLabel = 'Job Description';
+  let companyHidden = false;
+  let minorVisible = false;
+  let lastScore = null;
+  const root = document.documentElement;
+  root.setAttribute('data-theme', localStorage.getItem('rf-theme') || 'light');
+
+  function toggleTheme() {
+    const t = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', t);
+    localStorage.setItem('rf-theme', t);
+    if (lastScore !== null) drawGauge(lastScore);
+  }
+
+  function setLabel(el, label) {
+    document.querySelectorAll('.label-btn').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    currentLabel = label;
+  }
+
+  function updateChar() {
+    const v = document.getElementById('paste-input').value.length;
+    const el = document.getElementById('char-count');
+    el.textContent = v.toLocaleString() + ' / 10,000';
+    el.className = 'char-count' + (v > 9000 ? ' warn' : '');
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.innerHTML = '<div class="error-box">' + msg + '</div>';
+    el.style.display = 'block';
+  }
+  function hideError() { document.getElementById('error-msg').style.display = 'none'; }
+
+  const loadingLines = [
+    'Reading between the lines...',
+    'Consulting the corporate BS dictionary...',
+    'Finding the hidden asterisks...',
+    'Translating HR speak...'
+  ];
+  let loadingInterval;
+  function startLoading() {
+    let i = 0;
+    document.getElementById('loading-text').textContent = loadingLines[0];
+    loadingInterval = setInterval(() => {
+      i = (i + 1) % loadingLines.length;
+      document.getElementById('loading-text').textContent = loadingLines[i];
+    }, 1800);
+  }
+  function stopLoading() { clearInterval(loadingInterval); }
+
+  async function analyze() {
+    const text = document.getElementById('paste-input').value.trim();
+    if (!text || text.length < 50) { showError('Please paste at least 50 characters to analyze.'); return; }
+    hideError();
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('results').style.display = 'none';
+    startLoading();
+
+    try {
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, label: currentLabel })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+
+      stopLoading();
+      renderResults(data);
+    } catch (e) {
+      stopLoading();
+      document.getElementById('loading').style.display = 'none';
+      btn.disabled = false;
+      showError(e.message || 'Something went wrong. Please try again.');
+    }
+  }
+
+  function renderResults(d) {
+    lastScore = d.score;
+    companyHidden = false;
+    minorVisible = false;
+
+    document.getElementById('company-name-display').textContent = d.company_name || 'Unknown Company';
+    document.getElementById('doc-type-tag').textContent = currentLabel;
+    document.getElementById('company-row').style.opacity = '1';
+    document.getElementById('hide-toggle-btn').textContent = 'Hide details';
+
+    const majorList = document.getElementById('major-flags-list');
+    majorList.innerHTML = '';
+    (d.major_flags || []).forEach(f => {
+      majorList.innerHTML += `<div class="flag-item major">
+        <div class="flag-header">
+          <svg class="flag-icon" viewBox="0 0 16 16" fill="none">
+            <path d="M2.5 1.5v13M2.5 1.5l8 2.5-8 2.5" stroke="#c0392b" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="flag-title">${f.title}</span>
+        </div>
+        <div class="flag-roast">${f.roast}</div>
+      </div>`;
+    });
+
+    const minorList = document.getElementById('minor-flags-list');
+    minorList.innerHTML = '';
+    (d.minor_flags || []).forEach(f => {
+      minorList.innerHTML += `<div class="flag-item minor">
+        <div class="flag-header">
+          <svg class="flag-icon" viewBox="0 0 16 16" fill="none">
+            <path d="M2.5 1.5v13M2.5 1.5l8 2.5-8 2.5" stroke="#a05c00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span class="flag-title">${f.title}</span>
+        </div>
+        <div class="flag-roast">${f.roast}</div>
+      </div>`;
+    });
+
+    document.getElementById('minor-flags').style.display = 'none';
+    document.getElementById('show-minor-btn').textContent = '+ Show 2 minor red flags';
+    document.getElementById('score-num').textContent = d.score;
+    document.getElementById('verdict-text').textContent = d.verdict;
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+    document.getElementById('analyze-btn').disabled = false;
+
+    setTimeout(() => drawGauge(d.score), 80);
+  }
+
+  function drawGauge(score) {
+    const canvas = document.getElementById('gauge-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 200, 110);
+    const cx = 100, cy = 100, r = 78;
+    const isDark = root.getAttribute('data-theme') === 'dark';
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI, 0);
+    ctx.lineWidth = 13;
+    ctx.strokeStyle = isDark ? '#2a2826' : '#e4e2de';
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    const pct = (score - 1) / 9;
+    const endAngle = Math.PI + pct * Math.PI;
+    const grad = ctx.createLinearGradient(cx - r, cy, cx + r, cy);
+    grad.addColorStop(0, '#c0392b');
+    grad.addColorStop(0.5, '#d48c30');
+    grad.addColorStop(1, '#1D9E75');
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, Math.PI, endAngle);
+    ctx.lineWidth = 13;
+    ctx.strokeStyle = grad;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    const nx = cx + r * Math.cos(endAngle);
+    const ny = cy + r * Math.sin(endAngle);
+    ctx.beginPath();
+    ctx.arc(nx, ny, 5, 0, Math.PI * 2);
+    ctx.fillStyle = isDark ? '#eeece8' : '#111110';
+    ctx.fill();
+  }
+
+  function toggleMinor() {
+    minorVisible = !minorVisible;
+    document.getElementById('minor-flags').style.display = minorVisible ? 'block' : 'none';
+    document.getElementById('show-minor-btn').textContent = minorVisible ? '— Hide minor red flags' : '+ Show 2 minor red flags';
+  }
+
+  function toggleCompany() {
+    companyHidden = !companyHidden;
+    document.getElementById('company-row').style.opacity = companyHidden ? '0' : '1';
+    document.getElementById('company-row').style.pointerEvents = companyHidden ? 'none' : 'auto';
+    document.getElementById('hide-toggle-btn').textContent = companyHidden ? 'Show details' : 'Hide details';
+  }
+
+  function newAnalysis() {
+    document.getElementById('results').style.display = 'none';
+    document.getElementById('paste-input').value = '';
+    document.getElementById('char-count').textContent = '0 / 10,000';
+    document.getElementById('analyze-btn').disabled = false;
+    lastScore = null;
+    hideError();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+</script>
+</body>
+</html>
